@@ -1,19 +1,35 @@
 #include <Arduino.h>
 
-int ledPin = 2; //D6 ustawiamy, do którego pinu jest podłączona dioda
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <FTPServer.h>
 
-// funkcja setap uruchamia się raz przy uruchomieniu
-void setup() {
- pinMode(ledPin, OUTPUT); // ustawiamy pin jako wyjście
- Serial.begin(115200);
+const char* ssid = "*********************";
+const char* password = "*********************";
+
+FTPServer ftpServer;  
+void setup(void){
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  
+  if (SD.begin()) {
+      Serial.println("SD opened!");
+      ftpServer.begin("esp32","esp32", 50009);
+  }    
 }
 
-// funkcja loop uruchamia się w nieskończonej pętli
-void loop() {
-  digitalWrite(ledPin, HIGH);   // włączmy diodę, podajemy stan wysoki
-  delay(1000);                  // czekamy sekundę
-  Serial.print("Hello");
-  Serial.println("!!");
-  digitalWrite(ledPin, LOW);    // wyłączamy diodę, podajemy stan niski
-  delay(1000);                  // czekamy sekundę
+void loop(void){
+  ftpServer.listenCommands();
 }
