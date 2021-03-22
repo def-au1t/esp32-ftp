@@ -6,3 +6,5 @@
 .vscode/
 .idea/
 cmake-build-debug/
+
+src/credentials.h
