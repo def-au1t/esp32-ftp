@@ -9,6 +9,8 @@ public:
   {
     this->rfid = MFRC522(SS_PIN, RST_PIN);
     this->rfid.PCD_Init();
+    delay(4);
+    this->rfid.PCD_DumpVersionToSerial();
     Serial.println("RFID Init");
 
   }
@@ -20,7 +22,7 @@ public:
     {
       Serial.print(uid[i]);
     }
-    // Serial.println("");
+    Serial.println("");
     for (int i = 0; i < 4; i++)
     {
       if (validID[i] != uid[i])
@@ -37,8 +39,6 @@ bool verifyLoop(){
     this->history <<= 1;
     this->history |= actualCardStatus;
 
-    Serial.println("LOOP");
-    Serial.println(this->history);
     if ((this->history & 0b111) == 0b001)
     {
       if (!rfid.PICC_ReadCardSerial())
@@ -54,7 +54,7 @@ bool verifyLoop(){
       }
       else
       {
-        Serial.println("Invalid - blocked");
+        Serial.println("Invalid");
       }
     }
     return false;
