@@ -443,10 +443,13 @@ public:
       }
       return true;
     }
-
+    else if (command == "SYST")
+    {
+      this->ftpCommandClient.println("215 ESP32");
+    }
     else
     {
-      this->ftpCommandClient.println("500 Unrecognised command");
+      this->ftpCommandClient.println("500 Syntax error, command unrecognized.");
       return true;
     }
     return true;
@@ -585,6 +588,4 @@ public:
       return true;
     }
   }
-
-  
 };

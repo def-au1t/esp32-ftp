@@ -7,3 +7,4 @@
 .idea/
 cmake-build-debug/
 lib/FTPServer/tmp.h
+src/credentials.h
