@@ -7,16 +7,24 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <FTPServer.h>
+#include <MPU6050.h>
 
 #include "credentials.h"
+// #include "soc/timer_group_struct.h"
+// #include "soc/timer_group_reg.h"
 
-#define RFID_RST_PIN 34 // Configurable, see typical pin layout above
-#define RFID_SS_PIN 21  // Configurable, see typical pin layout above
+#define RFID_RST_PIN 34
+#define RFID_SS_PIN 32
+#define LIGHT_PIN 35
+
 
 bool isLEDOn = false;
 
 TaskHandle_t FTPTask;
+
 TaskHandle_t RFIDTask;
+TaskHandle_t AccTask;
+TaskHandle_t LightTask;
 
 void switchLamp()
 {
@@ -41,7 +49,19 @@ void launchWiFi()
   Serial.println(WiFi.localIP());
 }
 
-void SecondThread(void *params)
+void LightThread(void *params)
+{
+
+  while (1)
+  {
+    delay(500);
+    int light = analogRead(LIGHT_PIN);
+    Serial.println("Light: "+String(light));
+  }
+  vTaskDelete(NULL);
+}
+
+void RFIDThread(void *params)
 {
   RFIDReader rf = RFIDReader(RFID_SS_PIN, RFID_RST_PIN);
 
@@ -53,11 +73,27 @@ void SecondThread(void *params)
       switchLamp();
     }
   }
+  vTaskDelete(NULL);
+}
+
+void AccThread(void *params)
+{
+  MPU6050 mpu;
+  mpu.init();
+
+  while (1)
+  {
+    delay(1000);
+    mpu.printSensorData();
+  }
+  vTaskDelete(NULL);
 }
 
 void FTPThread(void *params)
 {
+
   FTPServer ftpServer = FTPServer();
+
   if (SD.begin())
   {
     Serial.println("SD opened!");
@@ -87,18 +123,35 @@ void setup()
   xTaskCreatePinnedToCore(
       FTPThread, /* Task function. */
       "FTP",     /* name of task. */
-      100000,     /* Stack size of task */
+      100000,    /* Stack size of task */
       NULL,      /* parameter of the task */
       1,         /* priority of the task */
       &FTPTask,  /* Task handle to keep track of created task */
       0);        /* pin task to core 0 */
+
   xTaskCreatePinnedToCore(
-      SecondThread,
+      RFIDThread,
       "RFID",
       10000,
       NULL,
       1,
       &RFIDTask,
+      1);
+    xTaskCreatePinnedToCore(
+      LightThread,
+      "Light",
+      10000,
+      NULL,
+      1,
+      &LightTask,
+      1);
+  xTaskCreatePinnedToCore(
+      AccThread,
+      "Acc",
+      10000,
+      NULL,
+      1,
+      &AccTask,
       1);
 }
 
