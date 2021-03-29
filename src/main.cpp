@@ -78,6 +78,7 @@ void RFIDThread(void *params)
 
 void AccThread(void *params)
 {
+  delay(100);
   MPU6050 mpu;
   mpu.init();
 
@@ -101,7 +102,7 @@ void FTPThread(void *params)
 
     while (1)
     {
-      delay(30);
+      // delay(1);
       ftpServer.listenCommands();
     }
   }
@@ -127,7 +128,7 @@ void setup()
       NULL,      /* parameter of the task */
       1,         /* priority of the task */
       &FTPTask,  /* Task handle to keep track of created task */
-      0);        /* pin task to core 0 */
+      1);        /* pin task to core */
 
   xTaskCreatePinnedToCore(
       RFIDThread,
@@ -136,7 +137,7 @@ void setup()
       NULL,
       1,
       &RFIDTask,
-      1);
+      0);
     xTaskCreatePinnedToCore(
       LightThread,
       "Light",
@@ -144,7 +145,7 @@ void setup()
       NULL,
       1,
       &LightTask,
-      1);
+      0);
   xTaskCreatePinnedToCore(
       AccThread,
       "Acc",
@@ -152,7 +153,7 @@ void setup()
       NULL,
       1,
       &AccTask,
-      1);
+      0);
 }
 
 void loop()
