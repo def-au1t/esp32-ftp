@@ -127,6 +127,11 @@ public:
         {
         case WAIT_USERNAME:
           Serial.println("WAIT_USERNAME");
+
+          if (this->rejectEncryption()) {
+            return;
+          }
+
           if (this->handleClientUsername())
           {
             this->status = WAIT_PASSWORD;
@@ -204,6 +209,18 @@ public:
     this->abortTransfer();
     this->ftpCommandClient.println("221 Goodbye");
     this->ftpCommandClient.stop();
+  }
+
+  // Return 530 on AUTH command, to indicate that we do not support encrypted connection
+  // Returns true if user is trying to use encryption, and will try again with different protocol
+  // Returns false if program can continue execution
+  boolean rejectEncryption() {
+    if (String(this->lastUserCommand) == "AUTH") {
+      this->ftpCommandClient.println("530 Please login with USER and PASS.");
+      return true;
+    } else {
+      return false;
+    }
   }
 
   boolean handleClientUsername()
