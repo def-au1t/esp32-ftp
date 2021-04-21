@@ -80,6 +80,7 @@ public:
 
   void listenCommands()
   {
+    // Serial.println("listenCommands: Current state is " + String(this->status));
 
     if (this->ftpCommandServer.hasClient())
     {
@@ -129,8 +130,9 @@ public:
         case WAIT_USERNAME:
           Serial.println("WAIT_USERNAME");
 
-          if (this->rejectEncryption())
+          if (this->encryptionRejected())
           {
+            Serial.println("encryptionRejected");
             return;
           }
 
@@ -214,9 +216,9 @@ public:
   }
 
   // Return 530 on AUTH command, to indicate that we do not support encrypted connection
-  // Returns true if user is trying to use encryption, and will try again with different protocol
+  // Returns true if user is trying to use encryption, and should try again with different protocol
   // Returns false if program can continue execution
-  boolean rejectEncryption()
+  boolean encryptionRejected()
   {
     if (String(this->lastUserCommand) == "AUTH")
     {
@@ -280,6 +282,47 @@ public:
       this->ftpCommandClient.println("257 \"" + currentDir + "\" is your current directory");
       return true;
     }
+    else if (command == "NOOP")
+    {
+      this->ftpCommandClient.println("200 NOOP");
+      return true;
+    }
+    else if (command == "QUIT")
+    {
+      return false;
+    }
+    else if (command == "ABOR")
+    {
+      Serial.println("ABORting");
+      this->abortTransfer();
+      this->ftpCommandClient.println("226 Data connection closed");
+
+      return true;
+    }
+    else if (command == "MODE")
+    {
+      if (params == "S")
+      {
+        this->ftpCommandClient.println("200 OK");
+      }
+      else
+      {
+        this->ftpCommandClient.println("504 Only Stream is supported");
+      }
+      return true;
+    }
+    else if (command == "STRU")
+    {
+      if (params == "F")
+      {
+        this->ftpCommandClient.println("200 OK");
+      }
+      else
+      {
+        this->ftpCommandClient.println("504 Only File is supported");
+      }
+      return true;
+    }
     else if (command == "CDUP")
     {
       return cd("..");
@@ -295,11 +338,37 @@ public:
       this->ftpCommandClient.println("211 End.");
       return true;
     }
+    else if (command == "MKD")
+    {
+      if (params == "")
+      {
+        this->ftpCommandClient.println("501 No file name given");
+        return false;
+      }
 
+      String dirname = getFullPath(params);
+
+      if (SD.exists(dirname))
+      {
+        this->ftpCommandClient.println("553 Directory " + dirname + " already exists");
+        return true;
+      }
+
+      if (SD.mkdir(dirname))
+      {
+        this->ftpCommandClient.println("275 Directory successfully created");
+        return true;
+      }
+      else
+      {
+        this->ftpCommandClient.println("550 MKD failed");
+        return true;
+      }
+    }
     else if (command == "TYPE")
     {
       if (params == "A")
-        this->ftpCommandClient.println("200 TYPE is now ASII");
+        this->ftpCommandClient.println("200 TYPE is now ASCII");
       else if (params == "I")
         this->ftpCommandClient.println("200 TYPE is now 8-bit binary");
       else
@@ -386,7 +455,7 @@ public:
       }
       return true;
     }
-    else if (command == "DELE")
+    else if (command == "DELE" || command == "RMD")
     {
       if (params == "")
       {
@@ -402,7 +471,7 @@ public:
         return false;
       }
 
-      if (SD.remove(filePath))
+      if (command == "DELE" ? SD.remove(filePath) : SD.rmdir(filePath))
       {
         this->ftpCommandClient.println("250 Deleted " + filePath);
         return true;
@@ -430,7 +499,7 @@ public:
         return false;
       }
 
-      Serial.println("Renaming " + String(buf));
+      Serial.println("Renaming " + fileToRename);
       this->ftpCommandClient.println("350 RNFR accepted");
     }
 
@@ -459,7 +528,7 @@ public:
       if (SD.rename(fileToRename, newFileName))
       {
         this->ftpCommandClient.println("250 File successfully renamed or moved");
-        Serial.println("Renaming " + String(buf));
+        Serial.println("Renaming " + fileToRename);
         fileToRename = "";
         return true;
       }
@@ -499,6 +568,39 @@ public:
         this->bytesTransfered = 0;
         this->transfer = RETRIEVE;
       }
+      return true;
+    }
+    else if (command == "STOR")
+    {
+      if (params == "")
+      {
+        this->ftpCommandClient.println("501 No file name given");
+        return false;
+      }
+
+      String filePath = getFullPath(params);
+
+      this->currentFile = SD.open(filePath, "w");
+
+      if (!this->currentFile)
+      {
+        this->ftpCommandClient.println("451 Can't create or open " + filePath);
+        return true;
+      }
+
+      if (!this->dataConnect())
+      {
+        this->ftpCommandClient.println("425 No data connection");
+        this->currentFile.close();
+        return true;
+      }
+
+      Serial.println("Receiving " + params);
+      this->ftpCommandClient.println("150 Connected to port " + String(this->ftpDataPort));
+      this->transactionBeginTime = millis();
+      this->bytesTransfered = 0;
+      this->transfer = RETRIEVE;
+
       return true;
     }
     else if (command == "SYST")
@@ -593,13 +695,14 @@ public:
     Serial.println("bytesTransfered" + String(this->bytesTransfered));
     if (deltaT > 0 && this->bytesTransfered > 0)
     {
-
       this->ftpCommandClient.println("226-File successfully transferred");
 
       this->ftpCommandClient.println("226 " + String(deltaT) + " ms, " + String(bytesTransfered / deltaT) + " kbytes/s");
     }
     else
+    {
       this->ftpCommandClient.println("226 File successfully transferred");
+    }
 
     this->currentFile.close();
     this->ftpDataClient.stop();
