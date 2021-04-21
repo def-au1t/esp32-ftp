@@ -599,7 +599,7 @@ public:
       this->ftpCommandClient.println("150 Connected to port " + String(this->ftpDataPort));
       this->transactionBeginTime = millis();
       this->bytesTransfered = 0;
-      this->transfer = RETRIEVE;
+      this->transfer = STORE;
 
       return true;
     }
