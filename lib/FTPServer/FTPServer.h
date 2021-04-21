@@ -89,6 +89,26 @@ public:
       this->ftpCommandClient = this->ftpCommandServer.available();
     }
 
+    if (this->transfer == RETRIEVE)
+    {
+      if (!this->dataSend())
+        this->transfer = NO_TRANSFER;
+      return;
+    }
+    else if (this->transfer == STORE)
+    {
+      if (!this->dataReceive())
+        this->transfer = NO_TRANSFER;
+      return;
+    }
+    else if (this->status > IDLE && millis() > this->connectTimeoutTime)
+    {
+      this->ftpCommandClient.println("530 Timeout");
+      vTaskDelay(200);
+      this->status = RESET;
+      return;
+    }
+
     switch (this->status)
     {
     case RESET:
@@ -120,56 +140,72 @@ public:
       }
       break;
     }
-    case WAIT_COMMAND:
-    case WAIT_PASSWORD:
     case WAIT_USERNAME:
+    {
       if (this->isNewClientCommand())
       {
-        switch (this->status)
+        Serial.println("WAIT_USERNAME");
+
+        if (this->encryptionRejected())
         {
-        case WAIT_USERNAME:
-          Serial.println("WAIT_USERNAME");
-
-          if (this->encryptionRejected())
-          {
-            Serial.println("encryptionRejected");
-            return;
-          }
-
-          if (this->handleClientUsername())
-          {
-            this->status = WAIT_PASSWORD;
-          }
-          else
-          {
-            this->status = RESET;
-            delay(100);
-          }
+          Serial.println("encryptionRejected");
           return;
-        case WAIT_PASSWORD:
-          Serial.println("WAIT_PASSWORD");
-          if (this->handleClientPassword())
-          {
-            this->status = WAIT_COMMAND;
-            this->connectTimeoutTime = millis() + 10 * 1000;
-          }
-          else
-          {
-            this->status = RESET;
-          }
-          return;
+        }
 
-        case WAIT_COMMAND:
-          Serial.println("WAIT_COMMAND");
-          if (!this->processCommand(this->lastUserCommand, this->lastUserParams))
-          {
-            this->status = RESET;
-            return;
-          }
-          else
-          {
-            this->connectTimeoutTime = millis() + FTP_TIMEOUT;
-          }
+        if (this->handleClientUsername())
+        {
+          this->status = WAIT_PASSWORD;
+        }
+        else
+        {
+          this->status = RESET;
+          vTaskDelay(100);
+        }
+        return;
+      }
+      else if (!this->ftpCommandClient.connected() || !this->ftpCommandClient)
+      {
+        this->status = WAIT_CONNECTION;
+        Serial.println("WAIT_DISCONNECTED");
+      }
+      break;
+    }
+    case WAIT_PASSWORD:
+    {
+      if (this->isNewClientCommand())
+      {
+        Serial.println("WAIT_PASSWORD");
+        if (this->handleClientPassword())
+        {
+          this->status = WAIT_COMMAND;
+          this->connectTimeoutTime = millis() + 10 * 1000;
+        }
+        else
+        {
+          this->status = RESET;
+        }
+        return;
+      }
+      else if (!this->ftpCommandClient.connected() || !this->ftpCommandClient)
+      {
+        this->status = WAIT_CONNECTION;
+        Serial.println("WAIT_DISCONNECTED");
+      }
+      break;
+    }
+    case WAIT_COMMAND:
+    {
+      if (this->isNewClientCommand())
+      {
+        Serial.println("WAIT_COMMAND");
+        if (!this->processCommand(this->lastUserCommand, this->lastUserParams))
+        {
+          this->status = RESET;
+          return;
+        }
+        else
+        {
+          this->connectTimeoutTime = millis() + FTP_TIMEOUT;
         }
       }
       else if (!this->ftpCommandClient.connected() || !this->ftpCommandClient)
@@ -178,23 +214,6 @@ public:
         Serial.println("WAIT_DISCONNECTED");
       }
     }
-
-    if (this->transfer == RETRIEVE)
-    {
-      if (!this->dataSend())
-        this->transfer = NO_TRANSFER;
-    }
-    else if (this->transfer == STORE)
-    {
-      if (!this->dataReceive())
-        this->transfer = NO_TRANSFER;
-    }
-
-    else if (this->status > IDLE && millis() > this->connectTimeoutTime)
-    {
-      this->ftpCommandClient.println("530 Timeout");
-      delay(200);
-      this->status = RESET;
     }
   }
 
@@ -400,18 +419,12 @@ public:
       {
         this->ftpCommandClient.println("150 Accepted data connection");
         uint16_t nm = 0;
-        //      Dir dir= SD.openDir(cwdName);
         File dir = SD.open(this->currentDir);
-        // char dtStr[15];
-        //  if(!SD.exists(cwdName))
         if ((!dir) || (!dir.isDirectory()))
           this->ftpCommandClient.println("550 Cannot open directory " + this->currentDir);
-        //        client.println( "550 Can't open directory " +String(parameters) );
         else
         {
-          //        while( dir.next())
           File file = dir.openNextFile();
-          //        while( dir.openNextFile())
           while (file)
           {
             String fileName, fileSize;
@@ -423,7 +436,7 @@ public:
             {
               if (command == "MLSD")
               {
-                this->ftpDataClient.println("Type=dir;Size=" + fileSize + ";" + "modify=20200101000000;" + " " + fileName);
+                this->ftpDataClient.println("Type=dir;Size=" + fileSize + ";" + "modify=20210101000000;" + " " + fileName);
               }
               else
               {
@@ -434,7 +447,7 @@ public:
             {
               if (command == "MLSD")
               {
-                this->ftpDataClient.println("Type=file;Size=" + fileSize + ";" + "modify=20200101000000;" + " " + fileName);
+                this->ftpDataClient.println("Type=file;Size=" + fileSize + ";" + "modify=20210101000000;" + " " + fileName);
               }
               else
               {
@@ -540,8 +553,6 @@ public:
       }
     }
 
-    //  RETR - Retrieve
-    //
     else if (command == "RETR")
     {
       if (params.length() == 0)
@@ -622,7 +633,6 @@ public:
     {
       while (!this->ftpDataServer.hasClient() && millis() - startTime < 10000)
       {
-        //delay(100);
         yield();
       }
       if (this->ftpDataServer.hasClient())
@@ -642,7 +652,7 @@ public:
     // Serial.println("Buffer: " + String(buf));
     // Serial.println("----: ");
     // Serial.println("numberBytesRead: " + String(numberBytesRead));
-    if (numberBytesRead > 0)
+    if (numberBytesRead > 0 && ftpDataClient.connected())
     {
       ftpDataClient.write((char *)buf, numberBytesRead);
       bytesTransfered += numberBytesRead;
@@ -660,7 +670,11 @@ public:
   {
     if (ftpDataClient.connected())
     {
+
       size_t numberBytesRead = ftpDataClient.readBytes((char *)buf, FTP_BUF_SIZE);
+      // Serial.println("Buffer: " + String(buf));
+      // Serial.println("----: ");
+      // Serial.println("numberBytesWrite: " + String(numberBytesRead));
       if (numberBytesRead > 0)
       {
         this->currentFile.write((uint8_t *)buf, numberBytesRead);
@@ -670,6 +684,7 @@ public:
     }
     else
     {
+      Serial.println("Transfer closed");
       this->closeTransfer();
       return false;
     }
@@ -687,7 +702,6 @@ public:
     this->transfer = NO_TRANSFER;
   }
 
-  // TODO:  Something is certainly wrong here:
   void closeTransfer()
   {
     uint32_t deltaT = (millis() - this->transactionBeginTime);
