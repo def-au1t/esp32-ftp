@@ -128,7 +128,8 @@ public:
         case WAIT_USERNAME:
           Serial.println("WAIT_USERNAME");
 
-          if (this->rejectEncryption()) {
+          if (this->rejectEncryption())
+          {
             return;
           }
 
@@ -214,11 +215,15 @@ public:
   // Return 530 on AUTH command, to indicate that we do not support encrypted connection
   // Returns true if user is trying to use encryption, and will try again with different protocol
   // Returns false if program can continue execution
-  boolean rejectEncryption() {
-    if (String(this->lastUserCommand) == "AUTH") {
+  boolean rejectEncryption()
+  {
+    if (String(this->lastUserCommand) == "AUTH")
+    {
       this->ftpCommandClient.println("530 Please login with USER and PASS.");
       return true;
-    } else {
+    }
+    else
+    {
       return false;
     }
   }
@@ -274,55 +279,14 @@ public:
       this->ftpCommandClient.println("257 \"" + currentDir + "\" is your current directory");
       return true;
     }
+    else if (command == "CDUP")
+    {
+      return cd("..");
+    }
     else if (command == "CWD")
     {
-
-      Serial.println("Old dir: " + this->currentDir);
-      if (params == ".")
-        return processCommand("PWD", "");
-      else if (params == "..")
-      {
-        String newPath;
-        if (this->currentDir == "/")
-        {
-          newPath == "/";
-        }
-        int sep = this->currentDir.lastIndexOf('/');
-        newPath = this->currentDir.substring(0, sep);
-        if (newPath == "")
-        {
-          newPath = "/";
-        }
-        this->currentDir = newPath;
-      }
-      else if (params == "/")
-      {
-        this->currentDir = "/";
-      }
-      else
-      {
-        if (params.charAt(0) == '/')
-        {
-          this->currentDir = params;
-        }
-        else
-        {
-          if (this->currentDir == "/")
-          {
-            this->currentDir.concat(params);
-          }
-          else
-          {
-            this->currentDir.concat("/" + params);
-          }
-        }
-      }
-
-      Serial.println("New dir: " + this->currentDir);
-      this->ftpCommandClient.println("250 Ok. Directory changed to " + this->currentDir);
-      return true;
+      return cd(params);
     }
-
     else if (command == "FEAT")
     {
       this->ftpCommandClient.println("211-Extensions suported:");
@@ -421,6 +385,33 @@ public:
       }
       return true;
     }
+    else if (command == "DELE")
+    {
+      if (params == "")
+      {
+        this->ftpCommandClient.println("501 No file name");
+        return false;
+      }
+
+      String filePath = getFullPath(params);
+
+      if (!SD.exists(filePath))
+      {
+        this->ftpCommandClient.println("550 File " + filePath + " not found");
+        return false;
+      }
+
+      if (SD.remove(filePath))
+      {
+        this->ftpCommandClient.println("250 Deleted " + filePath);
+        return true;
+      }
+      else
+      {
+        this->ftpCommandClient.println("450 Can't delete " + filePath);
+        return false;
+      }
+    }
 
     //  RETR - Retrieve
     //
@@ -432,15 +423,7 @@ public:
         return false;
       }
 
-      String filePath;
-      if (currentDir == "/")
-      {
-        filePath = "/" + params;
-      }
-      else
-      {
-        filePath = this->currentDir + "/" + params;
-      }
+      String filePath = getFullPath(params);
 
       this->currentFile = SD.open(filePath, "r");
       if (!this->currentFile)
@@ -604,5 +587,67 @@ public:
       Serial.println(params);
       return true;
     }
+  }
+
+  boolean cd(String path)
+  {
+    Serial.println("Old dir: " + this->currentDir);
+    if (path == ".")
+      return processCommand("PWD", "");
+    else if (path == "..")
+    {
+      String newPath;
+      if (this->currentDir == "/")
+      {
+        newPath == "/";
+      }
+      int sep = this->currentDir.lastIndexOf('/');
+      newPath = this->currentDir.substring(0, sep);
+      if (newPath == "")
+      {
+        newPath = "/";
+      }
+      this->currentDir = newPath;
+    }
+    else if (path == "/")
+    {
+      this->currentDir = "/";
+    }
+    else
+    {
+      if (path.charAt(0) == '/')
+      {
+        this->currentDir = path;
+      }
+      else
+      {
+        if (this->currentDir == "/")
+        {
+          this->currentDir.concat(path);
+        }
+        else
+        {
+          this->currentDir.concat("/" + path);
+        }
+      }
+    }
+
+    Serial.println("New dir: " + this->currentDir);
+    this->ftpCommandClient.println("250 Ok. Directory changed to " + this->currentDir);
+    return true;
+  }
+
+  String getFullPath(String relativePath)
+  {
+    String filePath;
+    if (currentDir == "/")
+    {
+      filePath = "/" + relativePath;
+    }
+    else
+    {
+      filePath = this->currentDir + "/" + relativePath;
+    }
+    return filePath;
   }
 };
