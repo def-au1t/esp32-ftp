@@ -44,6 +44,7 @@ private:
   unsigned long transactionBeginTime;
 
   String currentDir;
+  String fileToRename;
   File currentFile;
 
   String lastUserCommand;
@@ -409,6 +410,63 @@ public:
       else
       {
         this->ftpCommandClient.println("450 Can't delete " + filePath);
+        return false;
+      }
+    }
+
+    else if (command == "RNFR")
+    {
+      if (params == "")
+      {
+        this->ftpCommandClient.println("501 No file name");
+        return false;
+      }
+
+      fileToRename = getFullPath(params);
+
+      if (!SD.exists(fileToRename))
+      {
+        this->ftpCommandClient.println("550 File " + fileToRename + " not found");
+        return false;
+      }
+
+      Serial.println("Renaming " + String(buf));
+      this->ftpCommandClient.println("350 RNFR accepted");
+    }
+
+    else if (command == "RNTO")
+    {
+      if (params == "")
+      {
+        this->ftpCommandClient.println("501 No file name given");
+        return false;
+      }
+
+      if (fileToRename == "")
+      {
+        this->ftpCommandClient.println("501 No file name set by RNFR");
+        return false;
+      }
+
+      String newFileName = getFullPath(params);
+
+      if (SD.exists(newFileName))
+      {
+        this->ftpCommandClient.println("553 File " + fileToRename + " already exists");
+        return false;
+      }
+
+      if (SD.rename(fileToRename, newFileName))
+      {
+        this->ftpCommandClient.println("250 File successfully renamed or moved");
+        Serial.println("Renaming " + String(buf));
+        fileToRename = "";
+        return true;
+      }
+      else
+      {
+        this->ftpCommandClient.println("451 Rename failed");
+        fileToRename = "";
         return false;
       }
     }
