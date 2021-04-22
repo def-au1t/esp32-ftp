@@ -18,7 +18,7 @@ enum TransferStatus
   STORE = 2,
 };
 
-#define FTP_BUF_SIZE 8192
+#define FTP_BUF_SIZE 4096
 
 unsigned int FTP_TIMEOUT = 5 * 60 * 1000;
 
@@ -47,10 +47,13 @@ private:
   String fileToRename;
   File currentFile;
 
+  String filePath;
+
   String lastUserCommand;
   String lastUserParams;
 
   char buf[FTP_BUF_SIZE];
+  char buf2[FTP_BUF_SIZE];
   unsigned long bytesTransfered;
 
   uint16_t iCL;
@@ -69,9 +72,14 @@ public:
     this->ftpCommandServer.begin();
 
     this->currentDir = "/";
+    this->filePath = "";
 
     this->status = RESET;
     this->transfer = NO_TRANSFER;
+    for (int i = 0; i < FTP_BUF_SIZE; i++)
+    {
+      buf2[i] = '0' + (i % 10);
+    }
   }
 
   void configVariables()
@@ -424,6 +432,7 @@ public:
           this->ftpCommandClient.println("550 Cannot open directory " + this->currentDir);
         else
         {
+
           File file = dir.openNextFile();
           while (file)
           {
@@ -455,6 +464,7 @@ public:
               }
             }
             nm++;
+
             file = dir.openNextFile();
           }
 
@@ -562,7 +572,6 @@ public:
       }
 
       String filePath = getFullPath(params);
-
       this->currentFile = SD.open(filePath, "r");
       if (!this->currentFile)
         this->ftpCommandClient.println("550 File " + params + " not found");
@@ -591,6 +600,7 @@ public:
 
       String filePath = getFullPath(params);
 
+      this->filePath = filePath;
       this->currentFile = SD.open(filePath, "w");
 
       if (!this->currentFile)
@@ -654,6 +664,7 @@ public:
     // Serial.println("numberBytesRead: " + String(numberBytesRead));
     if (numberBytesRead > 0 && ftpDataClient.connected())
     {
+
       ftpDataClient.write((char *)buf, numberBytesRead);
       bytesTransfered += numberBytesRead;
       return true;
@@ -668,25 +679,48 @@ public:
 
   boolean dataReceive()
   {
-    if (ftpDataClient.connected())
+    size_t numberBytesRead = ftpDataClient.readBytes((uint8_t *)buf, FTP_BUF_SIZE);
+    if (numberBytesRead > 0)
     {
-
-      size_t numberBytesRead = ftpDataClient.readBytes((char *)buf, FTP_BUF_SIZE);
       // Serial.println("Buffer: " + String(buf));
-      // Serial.println("----: ");
-      // Serial.println("numberBytesWrite: " + String(numberBytesRead));
-      if (numberBytesRead > 0)
-      {
-        this->currentFile.write((uint8_t *)buf, numberBytesRead);
-        bytesTransfered += numberBytesRead;
+      // // Serial.println("----: ");
+      // Serial.println("ReadFromNetwork: " + String(numberBytesRead));
+
+      // Serial.println("CurrentFilePosition: " + String(this->currentFile.position()));
+
+      // if (this->currentFile.position() > 15 * 1000 * 1000)
+      // {
+      //   delay(5000);
+      // }
+
+
+      size_t position = this->currentFile.position();
+      size_t written = this->currentFile.write((uint8_t *)buf, numberBytesRead);
+      while(written == 0){
+        // Serial.println("Error");
+        // delay(1000);
+        this->currentFile.close();
+        this->currentFile = SD.open(this->filePath,"w");
+        this->currentFile.seek(position);
+        written = this->currentFile.write((uint8_t *)buf, numberBytesRead);
       }
+      // Serial.println("Written " + String(written));
+      // Serial.println("CurrentFilePosition: " + String(this->currentFile.position()));
+      // for (int i=0; i<FTP_BUF_SIZE; i++){
+      //   buf[i] = 0;
+      // }
+      bytesTransfered += numberBytesRead;
       return true;
     }
     else
     {
-      Serial.println("Transfer closed");
-      this->closeTransfer();
-      return false;
+      if(!this->ftpDataClient.connected()){
+        this->closeTransfer();
+        return false;
+      }
+      else{
+        return true;
+      }
     }
   }
 
@@ -706,7 +740,7 @@ public:
   {
     uint32_t deltaT = (millis() - this->transactionBeginTime);
     Serial.println("Transfer close");
-    Serial.println("bytesTransfered" + String(this->bytesTransfered));
+    Serial.println("bytesTransfered: " + String(this->bytesTransfered));
     if (deltaT > 0 && this->bytesTransfered > 0)
     {
       this->ftpCommandClient.println("226-File successfully transferred");
@@ -718,6 +752,7 @@ public:
       this->ftpCommandClient.println("226 File successfully transferred");
     }
 
+    this->currentFile.flush();
     this->currentFile.close();
     this->ftpDataClient.stop();
   }

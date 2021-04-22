@@ -100,7 +100,7 @@ void LightThread(void *params)
   {
     xLastWakeTime = xTaskGetTickCount();
     int light = analogRead(LIGHT_PIN);
-    // Serial.println("Light: " + String(light));
+    Serial.println("Light: " + String(light));
     vTaskDelayUntil(&xLastWakeTime, 1000);
   }
   vTaskDelete(NULL);
