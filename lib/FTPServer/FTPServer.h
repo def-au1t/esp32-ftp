@@ -53,7 +53,6 @@ private:
   String lastUserParams;
 
   char buf[FTP_BUF_SIZE];
-  char buf2[FTP_BUF_SIZE];
   unsigned long bytesTransfered;
 
   uint16_t iCL;
@@ -76,10 +75,6 @@ public:
 
     this->status = RESET;
     this->transfer = NO_TRANSFER;
-    for (int i = 0; i < FTP_BUF_SIZE; i++)
-    {
-      buf2[i] = '0' + (i % 10);
-    }
   }
 
   void configVariables()
