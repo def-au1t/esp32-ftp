@@ -2,6 +2,8 @@
 #include <MFRC522.h>
 #include <Arduino.h>
 
+#define VALID_ID_COUNT 2
+
 class RFIDReader
 {
 public:
@@ -12,7 +14,6 @@ public:
     delay(4);
     this->rfid.PCD_DumpVersionToSerial();
     Serial.println("RFID Init");
-
   }
 
   bool isValidID(byte uid[10])
@@ -21,19 +22,30 @@ public:
     for (uint8_t i = 0; i < 4; i++)
     {
       Serial.print(uid[i]);
+      Serial.print(",");
     }
     Serial.println("");
-    for (int i = 0; i < 4; i++)
+    bool valid = true;
+    for (int id = 0; id < VALID_ID_COUNT; id++)
     {
-      if (validID[i] != uid[i])
+      valid = true;
+      for (int i = 0; i < 4; i++)
       {
-        return false;
+        if (this->validIDs[id][i] != uid[i])
+        {
+          valid = false;
+          break;
+        }
+      }
+      if(valid == true){
+        return true;
       }
     }
-    return true;
+    return false;
   }
 
-bool verifyLoop(){
+  bool verifyLoop()
+  {
 
     int actualCardStatus = (int)rfid.PICC_IsNewCardPresent();
     this->history <<= 1;
@@ -58,10 +70,13 @@ bool verifyLoop(){
       }
     }
     return false;
-}
+  }
 
 private:
   MFRC522 rfid;
-  byte validID[4] = {201, 44, 11, 179};
+  byte validIDs[VALID_ID_COUNT][4] = {
+    {157, 144, 103, 217}, // J Student ID
+    {201, 44, 11, 179}    // White card
+     };
   int history = 0;
 };

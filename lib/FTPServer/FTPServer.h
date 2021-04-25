@@ -81,29 +81,25 @@ public:
   {
   }
 
-  void listenCommands()
+  void mainFTPLoop()
   {
-    // Serial.println("listenCommands: Current state is " + String(this->status));
+    // Serial.println("mainFTPLoop: Current state is " + String(this->status));
 
+    // Continue transfer if exists
+    if(this->transfer != NO_TRANSFER){
+      this->processTransfer();
+      return;
+    }
+
+    // New client appeared
     if (this->ftpCommandServer.hasClient())
     {
-      Serial.println("has-client");
+      Serial.println("New client");
       this->ftpCommandClient.stop();
       this->ftpCommandClient = this->ftpCommandServer.available();
     }
 
-    if (this->transfer == RETRIEVE)
-    {
-      if (!this->dataSend())
-        this->transfer = NO_TRANSFER;
-      return;
-    }
-    else if (this->transfer == STORE)
-    {
-      if (!this->dataReceive())
-        this->transfer = NO_TRANSFER;
-      return;
-    }
+    // Client timeout - disconnect
     else if (this->status > IDLE && millis() > this->connectTimeoutTime)
     {
       this->ftpCommandClient.println("530 Timeout");
@@ -217,6 +213,22 @@ public:
         Serial.println("WAIT_DISCONNECTED");
       }
     }
+    }
+  }
+
+
+  void processTransfer(){
+    if (this->transfer == RETRIEVE)
+    {
+      if (!this->dataSend())
+        this->transfer = NO_TRANSFER;
+      return;
+    }
+    else if (this->transfer == STORE)
+    {
+      if (!this->dataReceive())
+        this->transfer = NO_TRANSFER;
+      return;
     }
   }
 

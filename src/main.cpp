@@ -17,6 +17,7 @@
 
 bool isLEDOn = false;
 bool isFTPsuspended = false;
+bool unsecureMode = false;
 
 TaskHandle_t FTPTask;
 
@@ -25,10 +26,17 @@ TaskHandle_t AccTask;
 TaskHandle_t LightTask;
 TaskHandle_t SDCleanerTask;
 
-void switchLamp()
+void switchMode()
 {
+  if (!unsecureMode){
+    unsecureMode = true;
+    digitalWrite(2, true);
+  }
+  else{
+    unsecureMode = false;
+    digitalWrite(2, false);
+  }
   isLEDOn = !isLEDOn;
-  digitalWrite(2, isLEDOn);
 }
 
 void launchWiFi()
@@ -87,7 +95,7 @@ void SDCleanerThread(void *params)
   if (SD.begin())
   {
     Serial.println("SD cleaner start!");
-    SDCleaner("/");
+    // SDCleaner("/");
     Serial.println("SD cleaner finished!");
   }
   vTaskDelete(NULL);
@@ -95,13 +103,14 @@ void SDCleanerThread(void *params)
 
 void LightThread(void *params)
 {
+
   TickType_t xLastWakeTime;
   while (1)
   {
     xLastWakeTime = xTaskGetTickCount();
     int light = analogRead(LIGHT_PIN);
     Serial.println("Light: " + String(light));
-    vTaskDelayUntil(&xLastWakeTime, 1000);
+    vTaskDelayUntil(&xLastWakeTime, 2000);
   }
   vTaskDelete(NULL);
 }
@@ -110,13 +119,15 @@ void RFIDThread(void *params)
 {
   RFIDReader rf = RFIDReader(RFID_SS_PIN, RFID_RST_PIN);
 
+  digitalWrite(2, false);
   TickType_t xLastWakeTime;
   while (1)
   {
     xLastWakeTime = xTaskGetTickCount();
     if (rf.verifyLoop())
     {
-      switchLamp();
+
+      switchMode();
       vTaskSuspend(FTPTask);
       xTaskCreatePinnedToCore(
           SDCleanerThread,
@@ -128,7 +139,7 @@ void RFIDThread(void *params)
           1);
       vTaskResume(FTPTask);
     }
-    vTaskDelayUntil(&xLastWakeTime, 300);
+    vTaskDelayUntil(&xLastWakeTime, 500);
   }
   vTaskDelete(NULL);
 }
@@ -151,9 +162,7 @@ void AccThread(void *params)
 
 void FTPThread(void *params)
 {
-
   FTPServer ftpServer = FTPServer();
-
   if (SD.begin())
   {
     Serial.println("SD opened!");
@@ -162,8 +171,11 @@ void FTPThread(void *params)
     while (1)
     {
       vTaskDelay(1);
-      ftpServer.listenCommands();
+      ftpServer.mainFTPLoop();
     }
+  }
+  else{
+    Serial.println("SD Card error!");
   }
   vTaskDelete(NULL);
 }
