@@ -14,10 +14,16 @@
 #define RFID_RST_PIN 34
 #define RFID_SS_PIN 32
 #define LIGHT_PIN 35
+#define LED_PIN 2
 
 bool isLEDOn = false;
 bool isFTPsuspended = false;
 bool unsecureMode = false;
+bool accessDetected = false;
+
+#define LIGHT_VALUES_COUNT 10
+int lightValues[LIGHT_VALUES_COUNT] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+int lightIdx = 0;
 
 TaskHandle_t FTPTask;
 
@@ -28,11 +34,15 @@ TaskHandle_t SDCleanerTask;
 
 void switchMode()
 {
-  if (!unsecureMode){
+  if (!unsecureMode)
+  {
+    Serial.println("Unsecure mode ON");
     unsecureMode = true;
     digitalWrite(2, true);
   }
-  else{
+  else
+  {
+    Serial.println("Unsecure mode OFF");
     unsecureMode = false;
     digitalWrite(2, false);
   }
@@ -78,13 +88,17 @@ void SDCleaner(String path)
     if (file.isDirectory())
     {
       SDCleaner(fileName);
-      // Serial.println(fileName);
-      SD.rmdir(absolutePath(path,fileName));
+      // Serial.println(path);
+      Serial.println(fileName);
+      // Serial.println(absolutePath(path, fileName));
+      SD.rmdir(fileName);
     }
     else
     {
-      // Serial.println(fileName);
-      SD.remove(absolutePath(path,fileName));
+      // Serial.println(path);
+      Serial.println(fileName);
+      // Serial.println(absolutePath(path, fileName));
+      SD.remove(fileName);
     }
     file = dir.openNextFile();
   }
@@ -92,12 +106,26 @@ void SDCleaner(String path)
 
 void SDCleanerThread(void *params)
 {
+  Serial.println("Access detected!");
+  if (accessDetected == true || unsecureMode == true)
+  {
+    vTaskDelete(NULL);
+  }
+  accessDetected = true;
   if (SD.begin())
   {
+    for (int i = 0; i < 5; i++)
+    {
+      digitalWrite(2, true);
+      vTaskDelay(100);
+      digitalWrite(2, false);
+      vTaskDelay(100);
+    }
     Serial.println("SD cleaner start!");
-    // SDCleaner("/");
+    SDCleaner("/");
     Serial.println("SD cleaner finished!");
   }
+  accessDetected = false;
   vTaskDelete(NULL);
 }
 
@@ -105,12 +133,60 @@ void LightThread(void *params)
 {
 
   TickType_t xLastWakeTime;
+  int mean = -1;
+  int anomalyHistory = 0;
   while (1)
   {
     xLastWakeTime = xTaskGetTickCount();
     int light = analogRead(LIGHT_PIN);
     Serial.println("Light: " + String(light));
-    vTaskDelayUntil(&xLastWakeTime, 2000);
+    if (lightValues[LIGHT_VALUES_COUNT - 1] != -1)
+    {
+      int sum = 0;
+      for (int i = 0; i < LIGHT_VALUES_COUNT; i++)
+      {
+        sum += lightValues[i];
+      }
+      mean = sum / (LIGHT_VALUES_COUNT);
+      Serial.println("Light - AVG: " + String(mean));
+      if (abs(light - mean) > 20 && abs(light - mean) > mean * 0.1)
+      {
+        anomalyHistory |= 1;
+      }
+      if ((anomalyHistory & 0b111) == 0b111)
+      {
+        Serial.println("Light anomaly detected!");
+        vTaskSuspend(FTPTask);
+        xTaskCreatePinnedToCore(
+            SDCleanerThread,
+            "SDCleaner",
+            10000,
+            NULL,
+            1,
+            &SDCleanerTask,
+            1);
+        vTaskResume(FTPTask);
+        anomalyHistory = 0;
+        for (int i = 0; i < LIGHT_VALUES_COUNT; i++)
+        {
+          lightValues[i] = -1;
+        }
+        lightIdx = 0;
+      }
+      else
+      {
+        lightValues[lightIdx] = light;
+        lightIdx = (lightIdx + 1) % LIGHT_VALUES_COUNT;
+      }
+    }
+    else
+    { //Calibrating sensor
+      lightValues[lightIdx] = light;
+      lightIdx = (lightIdx + 1) % LIGHT_VALUES_COUNT;
+    }
+
+    anomalyHistory <<= 1;
+    vTaskDelayUntil(&xLastWakeTime, 500);
   }
   vTaskDelete(NULL);
 }
@@ -128,18 +204,8 @@ void RFIDThread(void *params)
     {
 
       switchMode();
-      vTaskSuspend(FTPTask);
-      xTaskCreatePinnedToCore(
-          SDCleanerThread,
-          "SDCleaner",
-          10000,
-          NULL,
-          1,
-          &SDCleanerTask,
-          1);
-      vTaskResume(FTPTask);
     }
-    vTaskDelayUntil(&xLastWakeTime, 500);
+    vTaskDelayUntil(&xLastWakeTime, 400);
   }
   vTaskDelete(NULL);
 }
@@ -154,8 +220,22 @@ void AccThread(void *params)
   while (1)
   {
     xLastWakeTime = xTaskGetTickCount();
-    mpu.printSensorData();
-    vTaskDelayUntil(&xLastWakeTime, 1000);
+    if (mpu.checkForAnomalies())
+    {
+      Serial.print("MPU - Intrusion detected");
+      vTaskSuspend(FTPTask);
+      xTaskCreatePinnedToCore(
+          SDCleanerThread,
+          "SDCleaner",
+          10000,
+          NULL,
+          1,
+          &SDCleanerTask,
+          1);
+      vTaskResume(FTPTask);
+      mpu.calibrate();
+    }
+    vTaskDelayUntil(&xLastWakeTime, 500);
   }
   vTaskDelete(NULL);
 }
@@ -174,7 +254,8 @@ void FTPThread(void *params)
       ftpServer.mainFTPLoop();
     }
   }
-  else{
+  else
+  {
     Serial.println("SD Card error!");
   }
   vTaskDelete(NULL);
