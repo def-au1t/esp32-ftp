@@ -8,6 +8,9 @@
     - [Połączenie](#połączenie)
   - [Struktura projektu](#struktura-projektu)
     - [`src/main.cpp`](#srcmaincpp)
+    - [`lib/FTPServer/FTPServer.h`](#libftpserverftpserverh)
+    - [`lib/MPU6050/MPU6050.h`](#libmpu6050mpu6050h)
+    - [`lib/RFIDReader/RFIDReader.h`](#librfidreaderrfidreaderh)
 
 ## Uruchomienie
 
@@ -51,3 +54,15 @@ Zalecane jest użycie oprogramowania Filezilla do testowania połączenia z serw
 ### `src/main.cpp`
 
 W tym pliku inicjalizowane są wszystkie funkcje programu - połączenie z wifi, odczyty z sensorów, obsługa karty RFID oraz serwer ftp. Zaimplementowane jest również wykrywanie anomalii - odpowiedzialne są za nie funkcje `void LightThread(void *params)`  oraz `void AccThread(void *params)` odpowiednio dla światła i ruchu. Kiedy urządzenie jest w stanie zabezpieczonym, wykrycie anomalii powoduje wyczyszczenie zawartości karty sd.
+
+### `lib/FTPServer/FTPServer.h`
+
+Plik zawiera implementację serwera FTP.
+
+### `lib/MPU6050/MPU6050.h`
+
+Komunikację z modułem MPU6050 i wykrywanie anomalii dotyczących położenia urządzenia.
+
+### `lib/RFIDReader/RFIDReader.h`
+
+Komunikacja z czytnikiem kart RFID, lista zaufanych kart (legitymacji studenckich i tokenów RFID mogących zmieniać stan urządzenia).
