@@ -11,3 +11,8 @@
 ## Setup
 
 1. Copy `src/credentials.h.sample` as `src/credentials.h`
+
+
+## Docs
+
+See [docs.md](docs.md).

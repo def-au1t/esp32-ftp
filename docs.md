@@ -43,7 +43,7 @@ Wymagana jest zmiana wartości `ssid` na nazwę sieci wifi, oraz `password` na h
 
 ### Kompilacja
 
-Do wgrania programu polecamy wykorzystać program VSCode z rozszerzeniem platformio. Po złożeniu układu według instrukcji użytkownika, i podłączeniu esp32 do komputera za pomocą kabla usb, należy przejść do zakładki PlatformIO, a następnie wybrać opcję *Upload and Monitor*. Program może zapytać o adres urządzenia - wybieramy odpowiednie. Po wgraniu programu na ekranie wyświetli się adres ip serwera ftp - możemy nawiązać z nim połączenie za pomocą klienta ftp.
+Do wgrania programu polecamy wykorzystać program VSCode z rozszerzeniem platformio. Po złożeniu układu według instrukcji użytkownika, i podłączeniu esp32 do komputera za pomocą kabla usb, należy przejść do zakładki PlatformIO, a następnie wybrać opcję _Upload and Monitor_. Program może zapytać o adres urządzenia - wybieramy odpowiednie. Po wgraniu programu na ekranie wyświetli się adres ip serwera ftp - możemy nawiązać z nim połączenie za pomocą klienta ftp.
 
 ### Połączenie
 
@@ -53,16 +53,54 @@ Zalecane jest użycie oprogramowania Filezilla do testowania połączenia z serw
 
 ### `src/main.cpp`
 
-W tym pliku inicjalizowane są wszystkie funkcje programu - połączenie z wifi, odczyty z sensorów, obsługa karty RFID oraz serwer ftp. Zaimplementowane jest również wykrywanie anomalii - odpowiedzialne są za nie funkcje `void LightThread(void *params)`  oraz `void AccThread(void *params)` odpowiednio dla światła i ruchu. Kiedy urządzenie jest w stanie zabezpieczonym, wykrycie anomalii powoduje wyczyszczenie zawartości karty sd.
+W tym pliku inicjalizowane są wszystkie funkcje programu - połączenie z wifi, odczyty z sensorów, obsługa karty RFID oraz serwer ftp. Zaimplementowane jest również wykrywanie anomalii - odpowiedzialne są za nie funkcje `void LightThread(void *params)` oraz `void AccThread(void *params)` odpowiednio dla światła i ruchu. Kiedy urządzenie jest w stanie zabezpieczonym, wykrycie anomalii powoduje wyczyszczenie zawartości karty sd.
 
 ### `lib/FTPServer/FTPServer.h`
 
 Plik zawiera implementację serwera FTP.
 
+Możliwe stany serwera FTP:
+- RESET - resetowanie połączenia - rozpoczęcie pracy od początku
+- WAIT_CONNECTION - oczekiwanie na połączenie
+- IDLE
+- WAIT_USERNAME - oczekiwanie na podanie nazwy użytkownika
+- WAIT_PASSWORD - oczekiwanie na podanie hasła
+- WAIT_COMMAND  - oczekiwanie na podanie komendy
+
+Zdarzenia obsługiwane są w pętli `void mainFTPLoop()`.
+
+Najważniejszą funkcją serwera jest `boolean processCommand(String command, String params)`, zajmująca się przetwarzaniem komend użytkownika.
+
+Obsługiwane komendy:
+
+- ABOR
+- CDUP
+- CWD
+- DELE
+- FEAT
+- LIST
+- MKD
+- MLSD
+- MODE
+- NOOP
+- PASV
+- PWD
+- QUIT
+- RETR
+- RMD
+- RNFR
+- RNTO
+- STOR
+- STRU
+- SYST
+- TYPE
+
+Pozwala to wykonywać wszystkie podstawowe operacje na serwerze ftp, pod warunkiem wykorzystywania jednego wątku klienta.
+
 ### `lib/MPU6050/MPU6050.h`
 
-Komunikację z modułem MPU6050 i wykrywanie anomalii dotyczących położenia urządzenia.
+Plik jest odpowiedzialnyt za komunikację z modułem MPU6050 i wykrywanie anomalii dotyczących położenia urządzenia. Po uruchomieniu urządzenie jest kalibrowane, a nastepnie w pętli obliczane są zmiany w położeniu. Gdy te będą zbyt duże, funkcja `boolean checkForAnomalies()` zwraca `true`, co powoduje uruchomienie działań niszczących dane na karcie, jesli urządzenie jest w odpowiednim stanie.
 
 ### `lib/RFIDReader/RFIDReader.h`
 
-Komunikacja z czytnikiem kart RFID, lista zaufanych kart (legitymacji studenckich i tokenów RFID mogących zmieniać stan urządzenia).
+Plik jest odpowiedzialny za komunikację z czytnikiem kart RFID. Zawiera również listę zaufanych kart (legitymacji studenckich i tokenów RFID mogących zmieniać stan urządzenia). Sprawdzenia następują w funkcjach `bool verifyLoop()` oraz `bool isValidID(byte uid[10])`.
