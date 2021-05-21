@@ -32,9 +32,12 @@ public:
     this->mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
     this->calibrate();
   }
-  void clearHistory(){
-    for(int i=0; i<6; i++){
-      for(int j=0; j< MPU_HISTORY_COUNT; j++){
+  void clearHistory()
+  {
+    for (int i = 0; i < 6; i++)
+    {
+      for (int j = 0; j < MPU_HISTORY_COUNT; j++)
+      {
         this->AccHistory[j][i] = -1;
       }
       this->AccAverage[i] = -1;
@@ -46,21 +49,21 @@ public:
   void calibrate()
   {
     Serial.println("MPU - Calibration started");
-    for(int i=0; i<MPU_HISTORY_COUNT; i++){
-      do{
+    for (int i = 0; i < MPU_HISTORY_COUNT; i++)
+    {
+      do
+      {
         Serial.println("MPU - Calibrating");
         mpu.getEvent(&this->acc, &this->gyro, &this->temp);
         this->printSensorData();
         vTaskDelay(50);
-      }
-      while((abs(this->acc.acceleration.x) < 7 && abs(this->acc.acceleration.y < 7) && abs(this->acc.acceleration.z < 7)) ||
-        (abs(this->acc.acceleration.x) > 11) ||
-        (abs(this->acc.acceleration.y) > 11) ||
-        (abs(this->acc.acceleration.z) > 11) ||
-        (abs(this->gyro.gyro.x) > 1)  ||
-        (abs(this->gyro.gyro.y) > 1)  ||
-        (abs(this->gyro.gyro.z) > 1)
-        );
+      } while ((abs(this->acc.acceleration.x) < 7 && abs(this->acc.acceleration.y < 7) && abs(this->acc.acceleration.z < 7)) ||
+               (abs(this->acc.acceleration.x) > 11) ||
+               (abs(this->acc.acceleration.y) > 11) ||
+               (abs(this->acc.acceleration.z) > 11) ||
+               (abs(this->gyro.gyro.x) > 1) ||
+               (abs(this->gyro.gyro.y) > 1) ||
+               (abs(this->gyro.gyro.z) > 1));
       this->saveToHistory();
       vTaskDelay(150);
     }
@@ -77,20 +80,24 @@ public:
     AccHistory[historyIdx][3] = this->acc.acceleration.x;
     AccHistory[historyIdx][4] = this->acc.acceleration.y;
     AccHistory[historyIdx][5] = this->acc.acceleration.z;
-    historyIdx = (historyIdx+1)%MPU_HISTORY_COUNT;
+    historyIdx = (historyIdx + 1) % MPU_HISTORY_COUNT;
   }
 
-  void calculateAverage(){
-    for (int i=0; i<6; i++){
+  void calculateAverage()
+  {
+    for (int i = 0; i < 6; i++)
+    {
       float sum = 0;
-      for(int j=0; j<MPU_HISTORY_COUNT; j++){
-        sum+=AccHistory[j][i];
+      for (int j = 0; j < MPU_HISTORY_COUNT; j++)
+      {
+        sum += AccHistory[j][i];
       }
-      this->AccAverage[i] = sum/MPU_HISTORY_COUNT;
+      this->AccAverage[i] = sum / MPU_HISTORY_COUNT;
     }
   }
 
-  boolean checkForAnomalies(){
+  boolean checkForAnomalies()
+  {
     // Serial.println("---");
     // for (int i=0; i<MPU_HISTORY_COUNT; i++){
     //   for(int j=0; j<6; j++){
@@ -101,40 +108,48 @@ public:
     // }
 
     // Serial.println("---");
-    if(this->AccHistory[MPU_HISTORY_COUNT-1][0] + 1 < 1e-3){
+    if (this->AccHistory[MPU_HISTORY_COUNT - 1][0] + 1 < 1e-3)
+    {
       Serial.println("MPU - not enought data for anomaly detection");
       return false;
     }
     mpu.getEvent(&this->acc, &this->gyro, &this->temp);
 
-  this->printSensorData();
+    this->printSensorData();
 
     this->calculateAverage();
     Serial.print("MPU - AVG: ");
-    for(int i=0; i<6; i++){
+    for (int i = 0; i < 6; i++)
+    {
       Serial.print(String(AccAverage[i]));
       Serial.print(",");
     }
     Serial.println("");
     this->anomalyHistory <<= 1;
-    if((abs(this->acc.acceleration.x) < 0.5 && abs(this->acc.acceleration.y < 0.5) && abs(this->acc.acceleration.z < 0.5)) ||
+    if ((abs(this->acc.acceleration.x) < 0.5 && abs(this->acc.acceleration.y < 0.5) && abs(this->acc.acceleration.z < 0.5)) ||
         (abs(this->acc.acceleration.x) > 15) ||
         (abs(this->acc.acceleration.y) > 15) ||
-        (abs(this->acc.acceleration.z) > 15) ){  //Error
+        (abs(this->acc.acceleration.z) > 15))
+    {
+      // Error
       return false;
     }
-    if((abs(this->acc.acceleration.x - AccAverage[3]) > 0.5) ||
-      (abs(this->acc.acceleration.y - AccAverage[4]) > 0.5) ||
-      (abs(this->acc.acceleration.z - AccAverage[5]) > 0.5)){  //Detect anomaly
-        Serial.println("MPU - sensor data change detected");
-        this->anomalyHistory |= 1;
-        if(((this->anomalyHistory) & 0b11111) == 0b11111){
-          this->clearHistory();
-          Serial.println("MPU - Intrusion!!!");
-          return true;
-        }
+    if ((abs(this->acc.acceleration.x - AccAverage[3]) > 0.5) ||
+        (abs(this->acc.acceleration.y - AccAverage[4]) > 0.5) ||
+        (abs(this->acc.acceleration.z - AccAverage[5]) > 0.5))
+    {
+      // Anomaly detected
+      Serial.println("MPU - sensor data change detected");
+      this->anomalyHistory |= 1;
+      if (((this->anomalyHistory) & 0b11111) == 0b11111)
+      {
+        this->clearHistory();
+        Serial.println("MPU - Intrusion!!!");
+        return true;
       }
-    else{
+    }
+    else
+    {
       this->saveToHistory();
     }
     return false;

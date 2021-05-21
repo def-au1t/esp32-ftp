@@ -86,7 +86,8 @@ public:
     // Serial.println("mainFTPLoop: Current state is " + String(this->status));
 
     // Continue transfer if exists
-    if(this->transfer != NO_TRANSFER){
+    if (this->transfer != NO_TRANSFER)
+    {
       this->processTransfer();
       return;
     }
@@ -216,8 +217,8 @@ public:
     }
   }
 
-
-  void processTransfer(){
+  void processTransfer()
+  {
     if (this->transfer == RETRIEVE)
     {
       if (!this->dataSend())
@@ -689,43 +690,27 @@ public:
     size_t numberBytesRead = ftpDataClient.readBytes((uint8_t *)buf, FTP_BUF_SIZE);
     if (numberBytesRead > 0)
     {
-      // Serial.println("Buffer: " + String(buf));
-      // // Serial.println("----: ");
-      // Serial.println("ReadFromNetwork: " + String(numberBytesRead));
-
-      // Serial.println("CurrentFilePosition: " + String(this->currentFile.position()));
-
-      // if (this->currentFile.position() > 15 * 1000 * 1000)
-      // {
-      //   delay(5000);
-      // }
-
-
       size_t position = this->currentFile.position();
       size_t written = this->currentFile.write((uint8_t *)buf, numberBytesRead);
-      while(written == 0){
-        // Serial.println("Error");
-        // delay(1000);
+      while (written == 0)
+      {
         this->currentFile.close();
-        this->currentFile = SD.open(this->filePath,"w");
+        this->currentFile = SD.open(this->filePath, "w");
         this->currentFile.seek(position);
         written = this->currentFile.write((uint8_t *)buf, numberBytesRead);
       }
-      // Serial.println("Written " + String(written));
-      // Serial.println("CurrentFilePosition: " + String(this->currentFile.position()));
-      // for (int i=0; i<FTP_BUF_SIZE; i++){
-      //   buf[i] = 0;
-      // }
       bytesTransfered += numberBytesRead;
       return true;
     }
     else
     {
-      if(!this->ftpDataClient.connected()){
+      if (!this->ftpDataClient.connected())
+      {
         this->closeTransfer();
         return false;
       }
-      else{
+      else
+      {
         return true;
       }
     }

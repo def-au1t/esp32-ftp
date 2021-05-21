@@ -37,7 +37,8 @@ public:
           break;
         }
       }
-      if(valid == true){
+      if (valid == true)
+      {
         return true;
       }
     }
@@ -75,8 +76,8 @@ public:
 private:
   MFRC522 rfid;
   byte validIDs[VALID_ID_COUNT][4] = {
-    {157, 144, 103, 217}, // J Student ID
-    {201, 44, 11, 179}    // White card
-     };
+      {157, 144, 103, 217}, // J Student ID
+      {201, 44, 11, 179}    // White card
+  };
   int history = 0;
 };
