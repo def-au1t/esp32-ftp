@@ -4,15 +4,7 @@
 - Jacek Nitychoruk
 - Karol Musur
 
-## Requirements
-
-- PlatformIO IDE plugin for VS Code
-
-## Setup
-
-1. Copy `src/credentials.h.sample` as `src/credentials.h`
-
-
 ## Docs
 
-See [docs.md](docs.md).
+- [Technical & code documentation](docs/tech_manual.pdf)
+- [User documentation](docs/user_manual.pdf)
