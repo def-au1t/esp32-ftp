@@ -4,7 +4,7 @@
 - Jacek Nitychoruk
 - Karol Musur
 
-## Docs
+## Docs:
 
 - [Technical & code documentation](docs/tech_manual.pdf)
 - [User documentation](docs/user_manual.pdf)
