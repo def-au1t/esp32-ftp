@@ -1,8 +1,7 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Arduino.h>
-
-#define VALID_ID_COUNT 2
+#include "../../src/credentials.h"
 
 class RFIDReader
 {
@@ -31,7 +30,7 @@ public:
       valid = true;
       for (int i = 0; i < 4; i++)
       {
-        if (this->validIDs[id][i] != uid[i])
+        if (VALID_IDS[id][i] != uid[i])
         {
           valid = false;
           break;
@@ -47,7 +46,6 @@ public:
 
   bool verifyLoop()
   {
-
     int actualCardStatus = (int)rfid.PICC_IsNewCardPresent();
     this->history <<= 1;
     this->history |= actualCardStatus;
@@ -75,9 +73,6 @@ public:
 
 private:
   MFRC522 rfid;
-  byte validIDs[VALID_ID_COUNT][4] = {
-      {157, 144, 103, 217}, // J Student ID
-      {201, 44, 11, 179}    // White card
-  };
+  byte VALID_IDS[]
   int history = 0;
 };
